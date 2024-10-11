@@ -447,11 +447,11 @@ for i, img in enumerate(original_images):
 
 
 
-"""
+
 # Setup the client
 client = FHEModelClient(path_dir=fhe_directory, key_dir="/home/giuk/keys_client/")
 serialized_evaluation_keys = client.get_serialized_evaluation_keys()
-"""
+
 # Client pre-processes new data
 X_new = np.random.rand(1, 20)
 
@@ -480,7 +480,7 @@ sample_input = image_to_tensor(image_path)
 np_array = sample_input.numpy()
 
 
-"""
+
 
 
 print("here is before encryption")
@@ -515,4 +515,4 @@ print(result)
 
 print("here is after result")
 
-"""
+
