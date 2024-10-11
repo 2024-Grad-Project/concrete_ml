@@ -1,4 +1,6 @@
 import time
+from concrete.ml.deployment import FHEModelDev, FHEModelClient, FHEModelServer
+
 
 import numpy as np
 import torch
@@ -301,6 +303,9 @@ q_module = compile_torch_model(
     reduce_sum_copy=False,
     device = "cpu"
 )
+fhe_directory = '/home/giuk/fhe_client_server_files/'
+dev = FHEModelDev(path_dir=fhe_directory, model=model)
+dev.save()
 
 """"""
 """def compile_torch_model(

@@ -1,5 +1,6 @@
 import time
-
+from concrete.ml.deployment import FHEModelDev, FHEModelClient, FHEModelServer
+from torchvision import transforms
 import numpy as np
 import torch
 import torch.utils
@@ -301,7 +302,9 @@ q_module = compile_torch_model(
     reduce_sum_copy=False,
     device = "cpu"
 )
-
+fhe_directory = '/home/giuk/fhe_client_server_files/'
+#dev = FHEModelDev(path_dir=fhe_directory, model=q_module)
+#dev.save()
 """"""
 """def compile_torch_model(
     torch_model: torch.nn.Module,
@@ -359,3 +362,67 @@ original_images = [img_array1, img_array2, img_array3, img_array4, img_array5, i
 print("\n원본 이미지들의 특성:")
 for i, img in enumerate(original_images):
     print(f"Original Image {i+1} - 평균: {img.mean():.4f}, 최대값: {img.max():.4f}, 최소값: {img.min():.4f}")
+
+
+
+
+
+
+
+# Setup the client
+client = FHEModelClient(path_dir=fhe_directory, key_dir="/home/giuk/keys_client/")
+serialized_evaluation_keys = client.get_serialized_evaluation_keys()
+
+# Client pre-processes new data
+X_new = np.random.rand(1, 20)
+
+
+
+def image_to_tensor(image_path):
+    # 이미지 로드
+    image = Image.open(image_path).convert("RGB")
+    
+    # 이미지 전처리 (크기 조정 및 텐서로 변환)
+    transform = transforms.Compose([
+        transforms.Resize((64, 64)),
+        transforms.ToTensor(),  # [0, 1] 범위의 Tensor로 변환 (C, H, W)
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # 일반적인 이미지넷 평균 및 표준편차
+    ])
+    
+    tensor = transform(image)  # (C, H, W)
+    tensor = tensor.unsqueeze(0)  # (1, 3, 224, 224)로 변환 (배치 크기 추가)
+    
+    return tensor
+
+image_path = './images/image5.jpg'
+sample_input = image_to_tensor(image_path)
+
+
+np_array = sample_input.numpy()
+
+
+
+
+
+
+print("here is before encryption")
+
+encrypted_data = client.quantize_encrypt_serialize(np_array)
+
+print("here is after encryption")
+# Setup the server
+server = FHEModelServer(path_dir=fhe_directory)
+server.load()
+print("here is after server.load")
+# Server processes the encrypted data
+encrypted_result = server.run(encrypted_data, serialized_evaluation_keys)
+print("here is after server.run")
+# Client decrypts the result
+
+
+
+result = client.deserialize_decrypt_dequantize(encrypted_result)
+
+print(result)
+
+print("here is after result")
