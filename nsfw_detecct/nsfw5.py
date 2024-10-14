@@ -136,7 +136,7 @@ plt.show()
 # Concrete-ML로 모델 컴파일
 from concrete.ml.torch.compile import compile_torch_model
 
-testimage = Image.open('./images/1.jpg')
+testimage = Image.open('./images/2.jpg')
 image_tensor3 = test_transforms(testimage).float()
 image_tensor3 = image_tensor3.unsqueeze_(0)
 
@@ -276,14 +276,14 @@ quantized_module = compile_torch_model(
     configuration = config,
     artifacts = None,
     show_mlir=True,
-    n_bits = 7,  # 양자화 비트 수
-    rounding_threshold_bits= {"n_bits": 7, "method": "approximate"},
+    n_bits = 6,  # 양자화 비트 수
+    rounding_threshold_bits= {"n_bits": 6, "method": "approximate"},
     p_error=0.05,  # 오류 허용 값을 비활성화
     global_p_error = None,
     verbose= False,
     inputs_encryption_status = None,
     reduce_sum_copy= False,
-    device = "cpu"
+    device = "cuda"
 )
 
 
@@ -309,7 +309,7 @@ q_module = compile_torch_model(
 """
 from concrete.ml.deployment import FHEModelDev, FHEModelClient, FHEModelServer
 print("here is after compile")
-fhe_directory = '/home/giuk/fhe_client_server_files_nsfw_1/' # 자기 자신에 맞게 파일명 바꾸기
+fhe_directory = '/home/giuk/fhe_client_server_files_nsfw_2_gpu/' # 자기 자신에 맞게 파일명 바꾸기
 dev = FHEModelDev(path_dir=fhe_directory, model=quantized_module)
 dev.save() #여기가 이제 deploy 생성코드
 # 컴파일된 모델로 추론
