@@ -136,7 +136,8 @@ plt.show()
 # Concrete-ML로 모델 컴파일
 from concrete.ml.torch.compile import compile_torch_model
 
-testimage = Image.open('./images/2.jpg')
+file_path_for_check = './images/9.jpg'
+testimage = Image.open(file_path_for_check)
 image_tensor3 = test_transforms(testimage).float()
 image_tensor3 = image_tensor3.unsqueeze_(0)
 
@@ -310,10 +311,12 @@ q_module = compile_torch_model(
 from concrete.ml.deployment import FHEModelDev, FHEModelClient, FHEModelServer
 print("here is after compile")
 fhe_directory = '/home/giuk/fhe_client_server_files_nsfw_2_gpu/' # 자기 자신에 맞게 파일명 바꾸기
-dev = FHEModelDev(path_dir=fhe_directory, model=quantized_module)
-dev.save() #여기가 이제 deploy 생성코드
+#dev = FHEModelDev(path_dir=fhe_directory, model=quantized_module)
+#dev.save() #여기가 이제 deploy 생성코드
 # 컴파일된 모델로 추론
 output_fhe = quantized_module.forward(input3.numpy())
+print("image")
+print(file_path_for_check)
 print(output_fhe)
 fhe_end = time.time()
 fhe_time = fhe_end - start
