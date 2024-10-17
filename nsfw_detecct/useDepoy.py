@@ -43,7 +43,9 @@ test_transforms = transforms.Compose([
     transforms.Normalize(mean=[0.485, 0.456, 0.406],
                          std=[0.229, 0.224, 0.225])
 ])
-testimage = Image.open('./images/2.jpg')
+
+image_path_for_check = './images/999.jpg'
+testimage = Image.open(image_path_for_check)
 image_tensor3 = test_transforms(testimage).float()
 image_tensor3 = image_tensor3.unsqueeze_(0)
 
@@ -61,8 +63,10 @@ print("here is after server.load")
 # Server processes the encrypted data
 total_fhe_time = 0
 start = time.time()
+print("Processing the image.(FHE Computation)")
+print(image_path_for_check)
 encrypted_result = server.run(encrypted_data, serialized_evaluation_keys)
-print("here is after server.run")
+print("here is after server.run(FHE Computation)")
 fhe_end = time.time()
 
 

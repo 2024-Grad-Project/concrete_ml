@@ -4,9 +4,9 @@ from torch import nn
 from torch.autograd import Variable
 from concrete.ml.deployment import FHEModelDev, FHEModelClient, FHEModelServer
 #여기서부터 deploy _ client & server
-fhe_directory = '/home/giuk/fhe_client_server_files_nsfw_2_gpu/' # 자기 자신에 맞게 파일명 바꾸기
+fhe_directory = '/home/giuk/fhe_client_server_files_nsfw_3_gpu/' # 자기 자신에 맞게 파일명 바꾸기
 # Setup the client
-client = FHEModelClient(path_dir=fhe_directory, key_dir="/home/giuk/keys_client_nsfw_14_Oct/")
+client = FHEModelClient(path_dir=fhe_directory, key_dir="/home/giuk/keys_client_nsfw_14_Oct_999/")
 serialized_evaluation_keys = client.get_serialized_evaluation_keys()
 
 from PIL import Image
@@ -30,7 +30,7 @@ def image_to_tensor(image_path):
     
     return tensor
 
-image_path = './images/5.jpg'
+image_path = './images/999.jpg'
 sample_input = image_to_tensor(image_path)
 
 
@@ -43,7 +43,7 @@ test_transforms = transforms.Compose([
     transforms.Normalize(mean=[0.485, 0.456, 0.406],
                          std=[0.229, 0.224, 0.225])
 ])
-testimage = Image.open('./images/2.jpg')
+testimage = Image.open('./images/999.jpg')
 image_tensor3 = test_transforms(testimage).float()
 image_tensor3 = image_tensor3.unsqueeze_(0)
 
