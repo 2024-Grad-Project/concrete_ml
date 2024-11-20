@@ -365,9 +365,30 @@ config = Configuration(
     insecure_key_cache_location="~/.cml_keycache"
 )
 
+def image_to_tensor(image_path):
+    # 이미지 로드
+    image = Image.open(image_path).convert("RGB")
+    
+    # 이미지 전처리 (크기 조정 및 텐서로 변환)
+    transform = transforms.Compose([
+        transforms.Resize((128, 128)),
+        transforms.ToTensor(),  # [0, 1] 범위의 Tensor로 변환 (C, H, W)
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # 일반적인 이미지넷 평균 및 표준편차
+    ])
+    
+    tensor = transform(image)  # (C, H, W)
+    tensor = tensor.unsqueeze(0)  # (1, 3, 224, 224)로 변환 (배치 크기 추가)
+    
+    return tensor
+
+image_path = './images/image5.jpg'
+sample_input = image_to_tensor(image_path)
+
+
+np_array = sample_input.numpy()
 q_module = compile_torch_model(
     torch_model=net, 
-    torch_inputset=x_train2, 
+    torch_inputset=np_array, 
     import_qat=False,
     configuration = config,
     artifacts = None,
@@ -381,7 +402,35 @@ q_module = compile_torch_model(
     reduce_sum_copy=False,
     device = "cpu"
 )
-fhe_directory = '/home/giuk/fhe_client_server_files_128/'
+
+
+
+def image_to_tensor(image_path):
+    # 이미지 로드
+    image = Image.open(image_path).convert("RGB")
+    
+    # 이미지 전처리 (크기 조정 및 텐서로 변환)
+    transform = transforms.Compose([
+        transforms.Resize((128, 128)),
+        transforms.ToTensor(),  # [0, 1] 범위의 Tensor로 변환 (C, H, W)
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # 일반적인 이미지넷 평균 및 표준편차
+    ])
+    
+    tensor = transform(image)  # (C, H, W)
+    tensor = tensor.unsqueeze(0)  # (1, 3, 224, 224)로 변환 (배치 크기 추가)
+    
+    return tensor
+
+image_path = './images/image5.jpg'
+sample_input = image_to_tensor(image_path)
+
+
+np_array = sample_input.numpy()
+print("here is before forward")
+output = q_module.forward(np_array)
+print(output)
+print("here is after forward")
+#fhe_directory = '/home/giuk/fhe_client_server_files_128/'
 #dev = FHEModelDev(path_dir=fhe_directory, model=q_module)
 #dev.save()
 """"""
@@ -448,9 +497,7 @@ for i, img in enumerate(original_images):
 
 
 
-# Setup the client
-client = FHEModelClient(path_dir=fhe_directory, key_dir="/home/giuk/keys_client/")
-serialized_evaluation_keys = client.get_serialized_evaluation_keys()
+
 
 # Client pre-processes new data
 X_new = np.random.rand(1, 20)
@@ -480,6 +527,11 @@ sample_input = image_to_tensor(image_path)
 np_array = sample_input.numpy()
 
 
+
+'''
+# Setup the client
+client = FHEModelClient(path_dir=fhe_directory, key_dir="/home/giuk/keys_client/")
+serialized_evaluation_keys = client.get_serialized_evaluation_keys()
 
 
 
@@ -514,5 +566,5 @@ print(f"  DEC execution completed in {dec_time:.4f} seconds")
 print(result)
 
 print("here is after result")
-
+'''
 

@@ -25,7 +25,8 @@ test_transforms = transforms.Compose([
 class CustomResNet50(nn.Module):
     def __init__(self):
         super(CustomResNet50, self).__init__()
-        original_model = models.resnet50() 
+        # Pretrained ResNet50 모델 로드
+        original_model = models.resnet50()
         self.conv1 = original_model.conv1
         self.bn1 = original_model.bn1
         self.relu = original_model.relu
@@ -34,26 +35,61 @@ class CustomResNet50(nn.Module):
         self.layer2 = original_model.layer2
         self.layer3 = original_model.layer3
         self.layer4 = original_model.layer4
+        # Fully connected layer 수정 (클래스 수에 따라 출력 차원 조정)
         self.fc = nn.Sequential(
             nn.Linear(2048, 512),
             nn.ReLU(),
             nn.Dropout(0.2),
-            nn.Linear(512, 10)
+            nn.Linear(512, 10)  # 출력 차원을 5로 수정
         )
+class CustomResNet50(nn.Module):
+    def __init__(self):
+        super(CustomResNet50, self).__init__()
+        # Pretrained ResNet50 모델 로드
+        original_model = models.resnet50()
+        self.conv1 = original_model.conv1
+        self.bn1 = original_model.bn1
+        self.relu = original_model.relu
+        self.maxpool = original_model.maxpool
+        self.layer1 = original_model.layer1
+        self.layer2 = original_model.layer2
+        self.layer3 = original_model.layer3
+        self.layer4 = original_model.layer4
+        # Fully connected layer 수정
+        self.fc = nn.Sequential(
+            nn.Linear(2048, 512),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(512, 10)  # 출력 차원
+        )
+        # 각 클래스에 대한 one-hot 벡터를 미리 생성
+        self.class_weights = nn.Parameter(torch.eye(10), requires_grad=False)
+
     def forward(self, x):
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)
+
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
         x = self.layer4(x)
-        N, C, H, W = x.shape# Slice 연산을 피하기
+
+        N, C, H, W = x.shape
         x = x.view(N, C, H * W)
         x = x.sum(dim=-1) / (H * W)
+
         x = self.fc(x)
-        return x
+        # 각 클래스와의 내적을 계산하여 가중치 부여
+        # 가장 높은 값을 가진 클래스의 인덱스에 가장 큰 가중치가 부여됨
+        weights = torch.matmul(x, self.class_weights.T)  # (batch_size, n_classes)
+        # 가중치가 가장 큰 클래스의 인덱스를 근사
+        # 각 클래스에 대한 가중치를 정규화하여 반환
+        normalized_weights = weights / weights.sum(dim=1, keepdim=True)
+        # 각 클래스의 인덱스와 가중치를 곱하여 합산
+        predicted_index = (normalized_weights * torch.arange(10).float()).sum(dim=1)
+        return predicted_index.round()  # 반올림하여 정수 인덱스 반환
 
 # Custom 변환 클래스 정의
 class MeanToMatMulTransform(torch.fx.Transformer):
@@ -73,19 +109,16 @@ class MeanToMatMulTransform(torch.fx.Transformer):
             return x  # 변환된 결과 반환
         return super().call_method(target, args, kwargs)
 
-# Library 불러오기 
-from torchvision import models
 # 모델 인스턴스 생성
-original_model = models.resnet50() 
-custom_model = CustomResNet50()
+model = CustomResNet50()
 
 # 사전 학습된 가중치 로드
 state_dict = torch.load('ResNet50_nsfw_model.pth', map_location=torch.device('cpu'))
-custom_model.load_state_dict(state_dict, strict=False)
-custom_model.eval()
+model.load_state_dict(state_dict, strict=False)
+model.eval()
 
 # Symbolic Trace로 모델 추적
-traced = symbolic_trace(custom_model)
+traced = symbolic_trace(model)
 
 # Mean 연산을 행렬 곱과 스케일링으로 대체
 transformed_model = MeanToMatMulTransform(traced).transform()
@@ -138,11 +171,11 @@ image_tensor4 = image_tensor4.unsqueeze_(0)
 input4 = Variable(image_tensor4)
 
 
-testimage = Image.open('./images/2.jpg')
+testimage = Image.open('./images/1.jpg')
 image_tensor3 = test_transforms(testimage).float()
 image_tensor3 = image_tensor3.unsqueeze_(0)
 
-iamage_input = Variable(image_tensor3)
+input3 = Variable(image_tensor3)
 
 
 # 이미지 전처리 변환 정의 (ResNet과 같은 이미지 전처리)
@@ -162,7 +195,7 @@ def load_image_as_tensor(image_path):
     return image_tensor
 
 # 이미지 경로 설정
-image_path = './images/2.jpg'
+image_path = './images/20.jpg'
 
 # 이미지를 torch_input으로 대체
 torch_input = load_image_as_tensor(image_path)
@@ -170,8 +203,8 @@ torch_input = load_image_as_tensor(image_path)
 
 from concrete.ml.quantization import QuantizedArray
 n_bits = 6
-#quantized_input3 = QuantizedArray(n_bits, input3.numpy())
-#quantized_input3_long = torch.tensor(quantized_input3.qvalues, dtype=torch.long)
+quantized_input3 = QuantizedArray(n_bits, input3.numpy())
+quantized_input3_long = torch.tensor(quantized_input3.qvalues, dtype=torch.long)
 # 모델 컴파일
 
 
@@ -181,7 +214,7 @@ from concrete.ml.quantization import QuantizedArray
 import numpy as np
 
 # 이미지 로드 및 전처리
-image_path = './images/2.jpg'
+image_path = './images/20.jpg'
 torch_input = load_image_as_tensor(image_path)
 
 # torch 텐서를 numpy 배열로 변환
@@ -311,20 +344,11 @@ q_module = compile_torch_model(
 """
 from concrete.ml.deployment import FHEModelDev, FHEModelClient, FHEModelServer
 print("here is after compile")
-
-
-
-# 컴파일된 모델로 추론
-output_fhe = quantized_module.forward(iamage_input.numpy())
-
-#여기가 이제 deploy 생성코드
 #fhe_directory = '/home/giuk/fhe_client_server_files_nsfw_1/' # 자기 자신에 맞게 파일명 바꾸기
 #dev = FHEModelDev(path_dir=fhe_directory, model=quantized_module)
-#dev.save() 
-
-
-
-
+#dev.save() #여기가 이제 deploy 생성코드
+# 컴파일된 모델로 추론
+output_fhe = quantized_module.forward(input3.numpy())
 print(output_fhe)
 fhe_end = time.time()
 fhe_time = fhe_end - start

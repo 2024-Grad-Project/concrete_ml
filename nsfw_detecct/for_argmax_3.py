@@ -21,7 +21,15 @@ test_transforms = transforms.Compose([
                          std=[0.229, 0.224, 0.225])
 ])
 
-# Custom ResNet50 모델 정의
+
+
+# utils.values_are_equal 및 numpy_max를 흉내내는 도우미 함수들 (직접 정의한다고 가정)
+def numpy_max(tensor):
+    return tensor.max()
+
+def values_are_equal(a, b):
+    return torch.eq(a, b)
+
 class CustomResNet50(nn.Module):
     def __init__(self):
         super(CustomResNet50, self).__init__()
@@ -34,26 +42,51 @@ class CustomResNet50(nn.Module):
         self.layer2 = original_model.layer2
         self.layer3 = original_model.layer3
         self.layer4 = original_model.layer4
+
+        # softmax 대신 sigmoid를 사용
         self.fc = nn.Sequential(
             nn.Linear(2048, 512),
             nn.ReLU(),
             nn.Dropout(0.2),
-            nn.Linear(512, 10)
+            nn.Linear(512, 10),
+            nn.Sigmoid()  # softmax 대신 sigmoid 사용
         )
+
+        # 가중치 행렬을 미리 생성하여 등록
+        self.register_buffer("index_weights", torch.arange(10).view(1, -1).float())
+
     def forward(self, x):
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)
+        
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
         x = self.layer4(x)
-        N, C, H, W = x.shape# Slice 연산을 피하기
+        
+        N, C, H, W = x.shape
         x = x.view(N, C, H * W)
         x = x.sum(dim=-1) / (H * W)
-        x = self.fc(x)
-        return x
+        
+        # sigmoid를 통과한 값 얻기
+        activations = self.fc(x)
+        
+        # 지수화하여 인덱스 계산 (5번째 클래스까지만)
+        exponents = torch.exp(activations[:, :5])  # 5번째 클래스까지만 사용
+        weighted_sum = (exponents * self.index_weights[:, :5]).sum(dim=1)
+        normalization_factor = exponents.sum(dim=1)
+        approximate_indices = (weighted_sum / normalization_factor).float()  # FLOAT로 변환
+        
+        return approximate_indices
+
+# 모델 인스턴스 생성
+
+
+# 모델 인스턴스 생성
+
+
 
 # Custom 변환 클래스 정의
 class MeanToMatMulTransform(torch.fx.Transformer):
@@ -73,19 +106,16 @@ class MeanToMatMulTransform(torch.fx.Transformer):
             return x  # 변환된 결과 반환
         return super().call_method(target, args, kwargs)
 
-# Library 불러오기 
-from torchvision import models
 # 모델 인스턴스 생성
-original_model = models.resnet50() 
-custom_model = CustomResNet50()
+model = CustomResNet50()
 
 # 사전 학습된 가중치 로드
 state_dict = torch.load('ResNet50_nsfw_model.pth', map_location=torch.device('cpu'))
-custom_model.load_state_dict(state_dict, strict=False)
-custom_model.eval()
+model.load_state_dict(state_dict, strict=False)
+model.eval()
 
 # Symbolic Trace로 모델 추적
-traced = symbolic_trace(custom_model)
+traced = symbolic_trace(model)
 
 # Mean 연산을 행렬 곱과 스케일링으로 대체
 transformed_model = MeanToMatMulTransform(traced).transform()
@@ -138,7 +168,7 @@ image_tensor4 = image_tensor4.unsqueeze_(0)
 input4 = Variable(image_tensor4)
 
 
-testimage = Image.open('./images/2.jpg')
+testimage = Image.open('./images/20.jpg')
 image_tensor3 = test_transforms(testimage).float()
 image_tensor3 = image_tensor3.unsqueeze_(0)
 
@@ -162,7 +192,7 @@ def load_image_as_tensor(image_path):
     return image_tensor
 
 # 이미지 경로 설정
-image_path = './images/2.jpg'
+image_path = './images/20.jpg'
 
 # 이미지를 torch_input으로 대체
 torch_input = load_image_as_tensor(image_path)
@@ -181,7 +211,7 @@ from concrete.ml.quantization import QuantizedArray
 import numpy as np
 
 # 이미지 로드 및 전처리
-image_path = './images/2.jpg'
+image_path = './images/20.jpg'
 torch_input = load_image_as_tensor(image_path)
 
 # torch 텐서를 numpy 배열로 변환
@@ -273,7 +303,7 @@ config = Configuration(
 
 quantized_module = compile_torch_model(
     transformed_model,  # 변환된 모델 사용
-    input4 ,  # 입력 텐서
+    iamage_input ,  # 입력 텐서
     import_qat=False,
     configuration = config,
     artifacts = None,
@@ -313,16 +343,11 @@ from concrete.ml.deployment import FHEModelDev, FHEModelClient, FHEModelServer
 print("here is after compile")
 
 
-
-# 컴파일된 모델로 추론
-output_fhe = quantized_module.forward(iamage_input.numpy())
-
-#여기가 이제 deploy 생성코드
 #fhe_directory = '/home/giuk/fhe_client_server_files_nsfw_1/' # 자기 자신에 맞게 파일명 바꾸기
 #dev = FHEModelDev(path_dir=fhe_directory, model=quantized_module)
-#dev.save() 
-
-
+#dev.save() #여기가 이제 deploy 생성코드
+# 컴파일된 모델로 추론
+output_fhe = quantized_module.forward(iamage_input.numpy())
 
 
 print(output_fhe)

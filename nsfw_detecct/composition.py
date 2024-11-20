@@ -21,45 +21,39 @@ test_transforms = transforms.Compose([
                          std=[0.229, 0.224, 0.225])
 ])
 
-# Custom ResNet50 모델 정의
-class CustomResNet50(nn.Module):
-    def __init__(self):
-        super(CustomResNet50, self).__init__()
-        original_model = models.resnet50() 
-        self.conv1 = original_model.conv1
-        self.bn1 = original_model.bn1
-        self.relu = original_model.relu
-        self.maxpool = original_model.maxpool
-        self.layer1 = original_model.layer1
-        self.layer2 = original_model.layer2
-        self.layer3 = original_model.layer3
-        self.layer4 = original_model.layer4
-        self.fc = nn.Sequential(
-            nn.Linear(2048, 512),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(512, 10)
-        )
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
-        N, C, H, W = x.shape# Slice 연산을 피하기
-        x = x.view(N, C, H * W)
-        x = x.sum(dim=-1) / (H * W)
-        x = self.fc(x)
-        return x
 
-# Custom 변환 클래스 정의
+
+# utils.values_are_equal 및 numpy_max를 흉내내는 도우미 함수들 (직접 정의한다고 가정)
+def numpy_max(tensor):
+    return tensor.max()
+
+def values_are_equal(a, b):
+    return torch.eq(a, b)
+
+#def get_approximate_argmax(activations, scale_factor=10):
+#    # 큰 값을 더 강조하기 위해 활성화 값을 scale_factor 배로 확장하고 지수화
+#    exponents = torch.exp(activations * scale_factor)
+
+    # 각 클래스의 인덱스에 해당하는 가중치 벡터 생성 (exponents와 같은 shape으로 broadcast)
+#    index_weights = torch.arange(activations.shape[1], dtype=activations.dtype, device=activations.device).view(1, -1)
+
+    # 활성화 값의 지수와 인덱스 가중치를 곱하고 합산하여 인덱스 근사
+#    weighted_sum = (exponents * index_weights).sum(dim=1)
+
+#    # 지수의 합으로 정규화하여 인덱스를 근사
+#    normalization_factor = exponents.sum(dim=1)
+#    approximate_indices = (weighted_sum / normalization_factor).float()  # INT64 -> FLOAT 변환
+
+#    return approximate_indices.round()
+
+import torch.fx
+
+# Mean 연산을 행렬 곱과 스케일링으로 대체하는 변환 클래스 정의
 class MeanToMatMulTransform(torch.fx.Transformer):
     def call_method(self, target: str, args, kwargs):
+        # mean 연산을 발견하면 대체
         if target == 'mean':
-            print(f"Replacing 'mean' with matrix multiplication and scaling at node {target}")
+            print(f"Replacing 'mean' with scaling at node {target}")
             
             # 입력 텐서를 펼친 후, H * W로 나눠 스케일링
             x = args[0]
@@ -72,20 +66,78 @@ class MeanToMatMulTransform(torch.fx.Transformer):
             x = x / num_elements  # H * W 요소로 나눠 평균 근사
             return x  # 변환된 결과 반환
         return super().call_method(target, args, kwargs)
+    
+class CustomResNet50(nn.Module):
+    def __init__(self):
+        super(CustomResNet50, self).__init__()
+        original_model = models.resnet50() 
+        self.conv1 = original_model.conv1
+        self.bn1 = original_model.bn1
+        self.relu = original_model.relu
+        self.maxpool = original_model.maxpool
+        self.layer1 = original_model.layer1
+        self.layer2 = original_model.layer2
+        self.layer3 = original_model.layer3
+        self.layer4 = original_model.layer4
 
-# Library 불러오기 
-from torchvision import models
+        # softmax 대신 sigmoid를 사용
+        self.fc = nn.Sequential(
+            nn.Linear(2048, 512),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(512, 10),
+            nn.Sigmoid()  # softmax 대신 sigmoid 사용
+        )
+
+        # 클래스 수에 맞게 index_weights를 미리 생성하여 모델에 등록 (여기서는 10으로 고정)
+        self.register_buffer("index_weights", torch.arange(10).view(1, -1).float())
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+        
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+        
+        N, C, H, W = x.shape
+        x = x.view(N, C, H * W)
+        x = x.sum(dim=-1) / (H * W)
+        
+        # sigmoid를 통과한 값 얻기
+        activations = self.fc(x)
+        
+        # 최대 활성화 값을 가진 인덱스를 근사 계산
+        indices = self.get_approximate_argmax(activations, scale_factor=10)
+        
+        return activations  # INT64 -> FLOAT 변환 추가
+
+    def get_approximate_argmax(self, activations, scale_factor=100):
+        # 큰 값을 더 강조하기 위해 활성화 값을 scale_factor 배로 확장하고 지수화
+        exponents = torch.exp(activations * scale_factor)
+
+        # 전체 index_weights를 사용하여 weighted_sum 계산
+        weighted_sum = (exponents * self.index_weights).sum(dim=1)
+
+        # 지수의 합으로 정규화하여 인덱스를 근사
+        normalization_factor = exponents.sum(dim=1)
+        approximate_indices = (weighted_sum / normalization_factor).float()  # INT64 -> FLOAT 변환
+
+        return approximate_indices.round()
+
 # 모델 인스턴스 생성
-original_model = models.resnet50() 
-custom_model = CustomResNet50()
+model = CustomResNet50()
 
 # 사전 학습된 가중치 로드
 state_dict = torch.load('ResNet50_nsfw_model.pth', map_location=torch.device('cpu'))
-custom_model.load_state_dict(state_dict, strict=False)
-custom_model.eval()
+model.load_state_dict(state_dict, strict=False)
+model.eval()
 
 # Symbolic Trace로 모델 추적
-traced = symbolic_trace(custom_model)
+traced = symbolic_trace(model)
 
 # Mean 연산을 행렬 곱과 스케일링으로 대체
 transformed_model = MeanToMatMulTransform(traced).transform()
@@ -273,13 +325,13 @@ config = Configuration(
 
 quantized_module = compile_torch_model(
     transformed_model,  # 변환된 모델 사용
-    input4 ,  # 입력 텐서
+    iamage_input ,  # 입력 텐서
     import_qat=False,
     configuration = config,
     artifacts = None,
     show_mlir=True,
-    n_bits = 7,  # 양자화 비트 수
-    rounding_threshold_bits= {"n_bits": 7, "method": "approximate"},
+    n_bits = 8,  # 양자화 비트 수
+    rounding_threshold_bits= {"n_bits": 8, "method": "approximate"},
     p_error=0.05,  # 오류 허용 값을 비활성화
     global_p_error = None,
     verbose= False,
@@ -313,16 +365,11 @@ from concrete.ml.deployment import FHEModelDev, FHEModelClient, FHEModelServer
 print("here is after compile")
 
 
-
-# 컴파일된 모델로 추론
-output_fhe = quantized_module.forward(iamage_input.numpy())
-
-#여기가 이제 deploy 생성코드
 #fhe_directory = '/home/giuk/fhe_client_server_files_nsfw_1/' # 자기 자신에 맞게 파일명 바꾸기
 #dev = FHEModelDev(path_dir=fhe_directory, model=quantized_module)
-#dev.save() 
-
-
+#dev.save() #여기가 이제 deploy 생성코드
+# 컴파일된 모델로 추론
+output_fhe = quantized_module.forward(iamage_input.numpy())
 
 
 print(output_fhe)

@@ -1,0 +1,19 @@
+Traceback (most recent call last):
+  File "/home/giuk/.local/lib/python3.10/site-packages/concrete/fhe/compilation/module_compiler.py", line 405, in compile
+    function.evaluate("Compiling", inputset, configuration, function_artifacts)
+  File "/home/giuk/.local/lib/python3.10/site-packages/concrete/fhe/compilation/module_compiler.py", line 233, in evaluate
+    self.trace(first_sample, artifacts)
+  File "/home/giuk/.local/lib/python3.10/site-packages/concrete/fhe/compilation/module_compiler.py", line 146, in trace
+    self.graph = Tracer.trace(self.function, parameters, location=self.location)
+  File "/home/giuk/.local/lib/python3.10/site-packages/concrete/fhe/tracing/tracer.py", line 82, in trace
+    output_tracers: Any = function(**arguments)
+  File "/home/giuk/git5/concrete_ml/nsfw_detecct/module1.py", line 105, in inc
+    indices = transformed_model(image)  # transformed_model 사용
+  File "/home/giuk/.local/lib/python3.10/site-packages/torch/fx/graph_module.py", line 737, in call_wrapped
+    return self._wrapped_call(self, *args, **kwargs)
+  File "/home/giuk/.local/lib/python3.10/site-packages/torch/fx/graph_module.py", line 315, in __call__
+    raise e.with_traceback(None)  # noqa: TRY200
+TypeError: conv2d() received an invalid combination of arguments - got (Tracer, Parameter, stride=tuple, padding=tuple, bias=NoneType), but expected one of:
+ * (Tensor input, Tensor weight, Tensor bias, tuple of ints stride, tuple of ints padding, tuple of ints dilation, int groups)
+ * (Tensor input, Tensor weight, Tensor bias, tuple of ints stride, str padding, tuple of ints dilation, int groups)
+

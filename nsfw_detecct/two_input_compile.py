@@ -11,7 +11,8 @@ import time
 start = time.time()
 # 이미지 디렉토리
 data_dir = 'images/'
-
+#print("Torch version:", torch.__version__)
+#print("Torchvision version:", torchvision.__version__)
 # 이미지 전처리 변환
 test_transforms = transforms.Compose([
     transforms.Resize(224),
@@ -21,7 +22,6 @@ test_transforms = transforms.Compose([
                          std=[0.229, 0.224, 0.225])
 ])
 
-# Custom ResNet50 모델 정의
 class CustomResNet50(nn.Module):
     def __init__(self):
         super(CustomResNet50, self).__init__()
@@ -34,27 +34,58 @@ class CustomResNet50(nn.Module):
         self.layer2 = original_model.layer2
         self.layer3 = original_model.layer3
         self.layer4 = original_model.layer4
+
+        # softmax 대신 sigmoid를 사용
         self.fc = nn.Sequential(
             nn.Linear(2048, 512),
             nn.ReLU(),
             nn.Dropout(0.2),
-            nn.Linear(512, 10)
+            nn.Linear(512, 10),
+            nn.Sigmoid()  # softmax 대신 sigmoid 사용
         )
-    def forward(self, x):
+
+        # 클래스 수에 맞게 index_weights를 미리 생성하여 모델에 등록 (여기서는 10으로 고정)
+        self.register_buffer("index_weights", torch.arange(10).view(1, -1).float())
+
+    def forward(self, x, y=None):
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)
+        
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
         x = self.layer4(x)
-        N, C, H, W = x.shape# Slice 연산을 피하기
+        
+        N, C, H, W = x.shape
         x = x.view(N, C, H * W)
         x = x.sum(dim=-1) / (H * W)
-        x = self.fc(x)
-        return x
+        
+        # sigmoid를 통과한 값 얻기
+        activations = self.fc(x)
+        
+        # 최대 활성화 값을 가진 인덱스를 근사 계산
+        indices = self.get_approximate_argmax(activations, scale_factor=10)
+        if y is not None:
+            indices = indices * y  # 원하는 연산 수행
+        return indices  # INT64 -> FLOAT 변환 추가
 
+    def get_approximate_argmax(self, activations, scale_factor=100):
+        # 큰 값을 더 강조하기 위해 활성화 값을 scale_factor 배로 확장하고 지수화
+        exponents = torch.exp(activations * scale_factor)
+
+        # 전체 index_weights를 사용하여 weighted_sum 계산
+        weighted_sum = (exponents * self.index_weights).sum(dim=1)
+
+        # 지수의 합으로 정규화하여 인덱스를 근사
+        normalization_factor = exponents.sum(dim=1)
+        approximate_indices = (weighted_sum / normalization_factor).float()  # INT64 -> FLOAT 변환
+
+        return approximate_indices.round()
+
+# 모델 인스턴스 생성
+model = CustomResNet50()
 # Custom 변환 클래스 정의
 class MeanToMatMulTransform(torch.fx.Transformer):
     def call_method(self, target: str, args, kwargs):
@@ -120,12 +151,12 @@ for entry in entries:
     image = Image.open(data_dir + entry)
 
     # 예측
-    index = predict_image(image)
+    #index = predict_image(image)
 
-    sub = fig.add_subplot(1, len(entries), i)
-    sub.set_title(classes[index])
-    plt.axis('off')
-    plt.imshow(image)
+    #sub = fig.add_subplot(1, len(entries), i)
+    #sub.set_title(classes[index])
+    #plt.axis('off')
+    #plt.imshow(image)
 plt.show()
 
 # Concrete-ML로 모델 컴파일
@@ -138,7 +169,7 @@ image_tensor4 = image_tensor4.unsqueeze_(0)
 input4 = Variable(image_tensor4)
 
 
-testimage = Image.open('./images/2.jpg')
+testimage = Image.open('./images/20.jpg')
 image_tensor3 = test_transforms(testimage).float()
 image_tensor3 = image_tensor3.unsqueeze_(0)
 
@@ -162,7 +193,7 @@ def load_image_as_tensor(image_path):
     return image_tensor
 
 # 이미지 경로 설정
-image_path = './images/2.jpg'
+image_path = './images/20.jpg'
 
 # 이미지를 torch_input으로 대체
 torch_input = load_image_as_tensor(image_path)
@@ -181,7 +212,7 @@ from concrete.ml.quantization import QuantizedArray
 import numpy as np
 
 # 이미지 로드 및 전처리
-image_path = './images/2.jpg'
+image_path = './images/20.jpg'
 torch_input = load_image_as_tensor(image_path)
 
 # torch 텐서를 numpy 배열로 변환
@@ -269,11 +300,13 @@ config = Configuration(
     use_insecure_key_cache=True,
     insecure_key_cache_location="~/.cml_keycache"
 )
+# 평문 입력을 설정하기 위해 inputs_encryption_status 매개변수 사용
+my_inputs_encryption_status = ['encrypted', 'clear']  # 첫 번째 입력은 암호화, 두 번째 입력은 평문
 
-
+constant_input = torch.tensor([[1.2]])  # example constant
 quantized_module = compile_torch_model(
     transformed_model,  # 변환된 모델 사용
-    input4 ,  # 입력 텐서
+    (input4, constant_input.numpy()) ,  # 입력 텐서
     import_qat=False,
     configuration = config,
     artifacts = None,
@@ -283,7 +316,7 @@ quantized_module = compile_torch_model(
     p_error=0.05,  # 오류 허용 값을 비활성화
     global_p_error = None,
     verbose= False,
-    inputs_encryption_status = None,
+    inputs_encryption_status =my_inputs_encryption_status,# None,#my_inputs_encryption_status,
     reduce_sum_copy= False,
     device = "cpu"
 )
@@ -315,7 +348,7 @@ print("here is after compile")
 
 
 # 컴파일된 모델로 추론
-output_fhe = quantized_module.forward(iamage_input.numpy())
+output_fhe = quantized_module.forward(iamage_input.numpy(), constant_input.numpy())
 
 #여기가 이제 deploy 생성코드
 #fhe_directory = '/home/giuk/fhe_client_server_files_nsfw_1/' # 자기 자신에 맞게 파일명 바꾸기

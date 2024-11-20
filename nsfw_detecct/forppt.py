@@ -7,10 +7,7 @@ from concrete.ml.deployment import FHEModelDev, FHEModelClient, FHEModelServer
 #fhe_client_server_files_nsfw_3_gpu = gpu machine with n_bits = 6 and image999
 #fhe_client_server_files_nsfw_1 = cpu machine with n_bits = 7 and image2
 #fhe_client_server_files_nsfw_2 = cpu machine with n_bits = 6 and image2
-fhe_directory = '/home/giuk/fhe_client_server_files_nsfw_1/' # 자기 자신에 맞게 파일명 바꾸기
-# Setup the client
-client = FHEModelClient(path_dir=fhe_directory, key_dir="/home/giuk/keys_client_nsfw_4_Nov/")
-serialized_evaluation_keys = client.get_serialized_evaluation_keys()
+
 
 from PIL import Image
 from torchvision import models
@@ -52,29 +49,33 @@ testimage = Image.open(image_path_for_check)
 image_tensor3 = test_transforms(testimage).float()
 image_tensor3 = image_tensor3.unsqueeze_(0)
 
-input_image = Variable(image_tensor3)
+image_input = Variable(image_tensor3)
 
 print("here is before encryption")
 
-encrypted_data = client.quantize_encrypt_serialize(input_image.numpy())
-print("here is after encryption")
+fhe_directory = '/home/giuk/fhe_client_server_files_nsfw_1/' # 자기 자신에 맞게 파일명 바꾸기
+
+
+
+# Setup the client
+client = FHEModelClient(path_dir=fhe_directory, key_dir="/home/giuk/keys_client_nsfw_4_Nov/")
+# Generate Key
+serialized_evaluation_keys = client.get_serialized_evaluation_keys()
+# Encryption
+encrypted_data = client.quantize_encrypt_serialize(image_input.numpy())
+
+
+
+
 # Setup the server
 server = FHEModelServer(path_dir=fhe_directory)
+# Load server
 server.load()
-print("here is after server.load")
 # Server processes the encrypted data
-total_fhe_time = 0
-start = time.time()
-print("Processing the image.(FHE Computation)")
-print(image_path_for_check)
 encrypted_result = server.run(encrypted_data, serialized_evaluation_keys)
-print("here is after server.run(FHE Computation)")
-fhe_end = time.time()
 
 
-fhe_time = fhe_end - start
-total_fhe_time += fhe_time
-print(f"  FHE execution completed in {fhe_time:.4f} seconds")
+
 # Client decrypts the result
 
 

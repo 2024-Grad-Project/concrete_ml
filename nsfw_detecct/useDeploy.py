@@ -1,5 +1,6 @@
 import torch
 import time
+import random
 from torch import nn
 from torch.autograd import Variable
 from concrete.ml.deployment import FHEModelDev, FHEModelClient, FHEModelServer
@@ -56,34 +57,27 @@ input_image = Variable(image_tensor3)
 
 print("here is before encryption")
 
+randConstant = random.randint(1, 1000)
+print(randConstant)
+
+
+# Client encrypts the result
 encrypted_data = client.quantize_encrypt_serialize(input_image.numpy())
-print("here is after encryption")
+
 # Setup the server
 server = FHEModelServer(path_dir=fhe_directory)
 server.load()
-print("here is after server.load")
+
 # Server processes the encrypted data
-total_fhe_time = 0
-start = time.time()
-print("Processing the image.(FHE Computation)")
 print(image_path_for_check)
 encrypted_result = server.run(encrypted_data, serialized_evaluation_keys)
-print("here is after server.run(FHE Computation)")
-fhe_end = time.time()
 
+# Server multiplies the ciphertext by a random constant.
+randConstant = random.randint(1, 1000)
+encrypted_result_with_constant = encrypted_result * randConstant
 
-fhe_time = fhe_end - start
-total_fhe_time += fhe_time
-print(f"  FHE execution completed in {fhe_time:.4f} seconds")
 # Client decrypts the result
-
-
-dec_start = time.time()
-result = client.deserialize_decrypt_dequantize(encrypted_result)
-dec_end = time.time()
-dec_time = dec_end - dec_start
-print(f"  DEC execution completed in {dec_time:.4f} seconds")
+result = client.deserialize_decrypt_dequantize(encrypted_result_with_constant)
 print(result)
 
-print("here is after result")
 
