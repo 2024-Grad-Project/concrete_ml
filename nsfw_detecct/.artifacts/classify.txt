@@ -1,0 +1,6 @@
+    @fhe.function({"image": "encrypted"})
+    def classify(image):
+        #indices = transformed_model(image)
+        indices = quantized_module.forward(image)
+        
+        return indices

@@ -76,6 +76,9 @@ encrypted_result = server.run(encrypted_data, serialized_evaluation_keys)
 randConstant = random.randint(1, 1000)
 encrypted_result_with_constant = encrypted_result * randConstant
 
+print(type(encrypted_result))
+print(encrypted_result.fhe.Value)
+
 # Client decrypts the result
 result = client.deserialize_decrypt_dequantize(encrypted_result_with_constant)
 print(result)

@@ -7,13 +7,16 @@ Traceback (most recent call last):
     self.graph = Tracer.trace(self.function, parameters, location=self.location)
   File "/home/giuk/.local/lib/python3.10/site-packages/concrete/fhe/tracing/tracer.py", line 82, in trace
     output_tracers: Any = function(**arguments)
-  File "/home/giuk/git5/concrete_ml/nsfw_detecct/module1.py", line 105, in inc
-    indices = transformed_model(image)  # transformed_model 사용
-  File "/home/giuk/.local/lib/python3.10/site-packages/torch/fx/graph_module.py", line 737, in call_wrapped
-    return self._wrapped_call(self, *args, **kwargs)
-  File "/home/giuk/.local/lib/python3.10/site-packages/torch/fx/graph_module.py", line 315, in __call__
-    raise e.with_traceback(None)  # noqa: TRY200
-TypeError: conv2d() received an invalid combination of arguments - got (Tracer, Parameter, stride=tuple, padding=tuple, bias=NoneType), but expected one of:
- * (Tensor input, Tensor weight, Tensor bias, tuple of ints stride, tuple of ints padding, tuple of ints dilation, int groups)
- * (Tensor input, Tensor weight, Tensor bias, tuple of ints stride, str padding, tuple of ints dilation, int groups)
-
+  File "/home/giuk/git5/concrete_ml/nsfw_detecct/module3.py", line 184, in classify
+    indices = quantized_module.forward(image)
+  File "/home/giuk/.local/lib/python3.10/site-packages/concrete/ml/quantization/quantized_module.py", line 457, in forward
+    all_values_are_floats(*x),
+  File "/home/giuk/.local/lib/python3.10/site-packages/concrete/ml/common/utils.py", line 570, in all_values_are_floats
+    return all(_is_of_dtype(value, SUPPORTED_FLOAT_TYPES) for value in values)
+  File "/home/giuk/.local/lib/python3.10/site-packages/concrete/ml/common/utils.py", line 570, in <genexpr>
+    return all(_is_of_dtype(value, SUPPORTED_FLOAT_TYPES) for value in values)
+  File "/home/giuk/.local/lib/python3.10/site-packages/concrete/ml/common/utils.py", line 439, in _is_of_dtype
+    values_types = _get_dtype(values)
+  File "/home/giuk/.local/lib/python3.10/site-packages/concrete/ml/common/utils.py", line 403, in _get_dtype
+    return set(map(str, (values.dtype,)))
+AttributeError: 'Tracer' object has no attribute 'dtype'

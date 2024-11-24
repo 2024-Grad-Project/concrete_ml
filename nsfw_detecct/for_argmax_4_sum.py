@@ -113,7 +113,7 @@ class CustomResNet50(nn.Module):
         # 최대 활성화 값을 가진 인덱스를 근사 계산
         indices = self.get_approximate_argmax(activations, scale_factor=10)
         
-        return activations  # INT64 -> FLOAT 변환 추가
+        return indices  # INT64 -> FLOAT 변환 추가
 
     def get_approximate_argmax(self, activations, scale_factor=100):
         # 큰 값을 더 강조하기 위해 활성화 값을 scale_factor 배로 확장하고 지수화

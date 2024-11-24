@@ -1,4 +1,0 @@
-    @fhe.function({"image": "encrypted"})
-    def inc(image):
-        indices = transformed_model(image)  # transformed_model 사용
-        return indices

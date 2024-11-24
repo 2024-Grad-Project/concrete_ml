@@ -1,8 +1,10 @@
 import torch
 import time
+import sys
 from torch import nn
 from torch.autograd import Variable
 from concrete.ml.deployment import FHEModelDev, FHEModelClient, FHEModelServer
+from concrete import fhe
 #여기서부터 deploy _ client & server
 fhe_directory = '/home/giuk/zama_fhe_directory/test_3/' # 자기 자신에 맞게 파일명 바꾸기
 # Setup the client
@@ -54,7 +56,7 @@ server.load()
 print("here is after server.load")
 # Server processes the encrypted data
 
-encrypted_result = server.run(encrypted_data, encrypted_constant,serialized_evaluation_keys)
+encrypted_result = server.run(encrypted_data,serialized_evaluation_keys)
 print("here is after server.run")
 
 # Client decrypts the result
@@ -66,6 +68,30 @@ byte_length = 4  # 바이트 길이 설정
 byte_data = num.to_bytes(byte_length, byteorder="big")
 print("This is the decryption result after multiplying the ciphertext by a constant.")
 encrypted_result_with_token = encrypted_result + byte_data
+
+# encrypted_result가 리턴값이라고 가정
+'''
+if isinstance(encrypted_result, fhe.Value):
+    print("Single FHE.Value:")
+    print(encrypted_result)
+
+elif isinstance(encrypted_result, tuple):
+    for i, item in enumerate(encrypted_result):
+        if isinstance(item, fhe.Value):
+            print(f"FHE.Value at index {i}:")
+            print(item)
+        else:
+            print(f"Non-FHE.Value at index {i}: {item}")
+else:
+    print("The result is not an FHE.Value or a tuple of FHE.Values.")
+'''
+# print(type(encrypted_result))
+# sys.set_int_max_str_digits(1000000)
+# temp_res = int.from_bytes(encrypted_result, byteorder="big")
+# total = temp_res + num
+# print(len(encrypted_result))
+# encrypted_result_with_token = total.to_bytes(16640, byteorder="big")
+
 #print("encyrpted+1",encrypted_result_with_token)
 print(result)
 result_with_token = client.deserialize_decrypt_dequantize(encrypted_result_with_token)

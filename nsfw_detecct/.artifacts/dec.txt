@@ -1,3 +1,0 @@
-    @fhe.function({"x": "encrypted", "y": "clear"})
-    def dec(x, y):
-        return (x * y) % 20

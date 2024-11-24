@@ -1,6 +1,0 @@
-%0 = x                        # EncryptedScalar<uint3>
-%1 = y                        # ClearScalar<uint2>
-%2 = multiply(%0, %1)         # EncryptedScalar<uint1>
-%3 = 20                       # ClearScalar<uint5>
-%4 = remainder(%2, %3)        # EncryptedScalar<uint1>
-return %4
