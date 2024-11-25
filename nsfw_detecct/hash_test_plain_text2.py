@@ -1,13 +1,16 @@
 import math
 
 def mod(a, b):
-    # Modulo 연산 구현
-    return a - math.floor(a / b) * b
+    """Modulo 구현"""
+    div_result = a / b
+    floor_result = math.floor(div_result)
+    product = b * floor_result
+    return a - product
 
-def custom_forward(indices, y, z):
+def approximate_hash_function(indices, y, z):
     # Step 1: Scale inputs
     scaled_indices = indices * 0.1
-    scaled_y = y * 0.2
+    scaled_y = y * 1e-11
     scaled_z = z * 0.3
 
     # Step 2: Combine inputs
@@ -25,9 +28,9 @@ def custom_forward(indices, y, z):
 
 # 예제 입력
 indices = 5.0  # 예: 1.0
-y = 10.5        # 예: 2.0
+y = 20241125182911.0       # 예: 2.0
 z = 1919.0       # 예: 3.0
 
 # 함수 실행
-result = custom_forward(indices, y, z)
+result = approximate_hash_function(indices, y, z)
 print(f"Result: {result}")
