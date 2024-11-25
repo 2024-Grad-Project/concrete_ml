@@ -109,7 +109,7 @@ class CustomResNet50(nn.Module):
         
         # sigmoid를 통과한 값 얻기
         activations = self.fc(x)
-        z = 5.0
+        z = 1919.0
         # 최대 활성화 값을 가진 인덱스를 근사 계산
         indices = self.approximate_argmax(activations, scale_factor=10)
         max = self.approximate_argmax_real(activations)

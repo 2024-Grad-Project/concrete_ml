@@ -1,24 +1,22 @@
 import time
-from concrete.ml.deployment import FHEModelDev, FHEModelClient, FHEModelServer
-from torchvision import transforms
-import numpy as np
-import torch
-import torch.utils
-#from concrete.compiler import check_gpu_available
-from sklearn.datasets import load_digits
-from sklearn.model_selection import train_test_split
-from torch import nn
-from torch.utils.data import DataLoader, TensorDataset
-from tqdm import tqdm
 
-from concrete.ml.torch.compile import compile_torch_model
+# import numpy as np
+# import torch
+# import torch.utils
+# #from concrete.compiler import check_gpu_available
+# from sklearn.datasets import load_digits
+# from sklearn.model_selection import train_test_split
+
+# from tqdm import tqdm
+
+
 
 # And some helpers for visualization.
 
 #:wq
 # %matplotlib inline
 
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 from PIL import Image
 """
@@ -220,351 +218,31 @@ class ImprovedCNN(nn.Module):
         self.fc2 = nn.Linear(512, n_classes)
         self.dropout = nn.Dropout(0.5)
 
-    def forward(self, x):
-        x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
-        x = self.pool(F.relu(self.conv3(x)))
-        x = x.view(-1, 128 * 16 * 16)
-        x = F.relu(self.fc1(x))
-        x = self.dropout(x)
-        x = self.fc2(x)
-        return x
+    def forward(self, indices, y, z):
+        # Step 1: Scale inputs
+        scaled_indices = indices * 0.1
+        scaled_y = y * 0.2
+        scaled_z = z * 0.3
+
+        # Step 2: Combine inputs
+        combined = scaled_indices + scaled_y + scaled_z
+
+        # Step 3: Apply non-linear transformation
+        transformed = torch.exp(torch.abs(torch.log(torch.pow(combined, 2) + 1e-5)))
+
+        # Step 4: Apply modulo for additional complexity
+        modulo_result = mod(transformed, 1.0)  # Modulo 연산으로 0~1 범위로 제한
+
+        # Step 5: Apply final non-linear transformation
+        final_hash = torch.tanh(modulo_result)  # 추가 비선형성
+        return final_hash
 
 # 난수 생성기 시드 설정
 torch.manual_seed(42)
 
 # 모델 인스턴스 생성
 net = ImprovedCNN(2)
-def train_one_epoch(net, optimizer, train_loader):
-    # Cross Entropy loss for classification when not using a softmax layer in the network
-    loss = nn.CrossEntropyLoss()
 
-    net.train()
-    avg_loss = 0
-    for data, target in train_loader:
-        optimizer.zero_grad()
-        output = net(data)
-        loss_net = loss(output, target.long())
-        loss_net.backward()
-        optimizer.step()
-        avg_loss += loss_net.item()
+output = net(5.0 ,10.5, 5.0)
 
-    return avg_loss / len(train_loader)
-
-
-# Create the tiny CNN with 10 output classes
-N_EPOCHS = 150
-
-# Create a train data loader여기서 x_train이 원래 x_train2였는데
-# x_train으로 바꿈
-train_dataset = TensorDataset(torch.Tensor(x_train2), torch.Tensor(y_train))
-train_dataloader = DataLoader(train_dataset, batch_size=64)
-
-# Create a test data loader to supply batches for network evaluation (test)
-test_dataset = TensorDataset(torch.Tensor(x_test), torch.Tensor(y_test))
-test_dataloader = DataLoader(test_dataset)
-
-# Train the network with Adam, output the test set accuracy every epoch
-net2 = TinyCNN(2)
-losses_bits = []
-optimizer = torch.optim.Adam(net.parameters())
-for _ in tqdm(range(N_EPOCHS), desc="Training"):
-    losses_bits.append(train_one_epoch(net, optimizer, train_dataloader))
-
-fig = plt.figure(figsize=(8, 4))
-plt.plot(losses_bits)
-plt.ylabel("Cross Entropy Loss")
-plt.xlabel("Epoch")
-plt.title("Training set loss during training")
-plt.grid(True)
-plt.show()
-
-
-def test_torch(net, test_loader):
-    """Test the network: measure accuracy on the test set."""
-
-    # Freeze normalization layers
-    net.eval()
-
-    all_y_pred = np.zeros((len(test_loader)), dtype=np.int64)
-    all_targets = np.zeros((len(test_loader)), dtype=np.int64)
-
-    # Iterate over the batches
-    idx = 0
-    for data, target in test_loader:
-        # Accumulate the ground truth labels
-        endidx = idx + target.shape[0]
-        all_targets[idx:endidx] = target.numpy()
-
-        # Run forward and get the predicted class id
-        output = net(data).argmax(1).detach().numpy()
-        all_y_pred[idx:endidx] = output
-
-        idx += target.shape[0]
-
-    # Print out the accuracy as a percentage
-    n_correct = np.sum(all_targets == all_y_pred)
-    print(
-        f"Test accuracy for fp32 weights and activations: "
-        f"{n_correct / len(test_loader) * 100:.2f}%"
-    )
-
-
-
-
-def test_with_concrete(quantized_module, test_loader, use_sim):
-    """Test a neural network that is quantized and compiled with Concrete ML."""
-
-    # Casting the inputs into int64 is recommended
-    all_y_pred = np.zeros((len(test_loader)), dtype=np.int64)
-    all_targets = np.zeros((len(test_loader)), dtype=np.int64)
-
-    # Iterate over the test batches and accumulate predictions and ground truth labels in a vector
-    idx = 0
-    for data, target in tqdm(test_loader):
-        data = data.numpy()
-        target = target.numpy()
-
-        fhe_mode = "simulate" if use_sim else "execute"
-
-        # Quantize the inputs and cast to appropriate data type
-        y_pred = quantized_module.forward(data, fhe=fhe_mode)
-        print("y_pred")
-        print(y_pred)
-        print(idx)
-        endidx = idx + target.shape[0]
-
-        # Accumulate the ground truth labels
-        all_targets[idx:endidx] = target
-
-        # Get the predicted class id and accumulate the predictions
-        y_pred = np.argmax(y_pred, axis=1)
-        all_y_pred[idx:endidx] = y_pred
-
-        # Update the index
-        idx += target.shape[0]
-
-
-        for i, (pred, true) in enumerate(zip(y_pred, target)):
-            print(f"Image {i+1}: Predicted: {pred}, Actual: {true}")
-
-    # Compute and report results
-    n_correct = np.sum(all_targets == all_y_pred)
-
-    return n_correct / len(test_loader)
-
-n_bits = 7
-
-use_gpu_if_available = False
-devicew = "cpu"# "cuda" if use_gpu_if_available and check_gpu_available() else "cpu"
-from concrete.fhe import Configuration
-
-config = Configuration(
-    enable_unsafe_features=True,
-    use_insecure_key_cache=True,
-    insecure_key_cache_location="~/.cml_keycache"
-)
-
-def image_to_tensor(image_path):
-    # 이미지 로드
-    image = Image.open(image_path).convert("RGB")
-    
-    # 이미지 전처리 (크기 조정 및 텐서로 변환)
-    transform = transforms.Compose([
-        transforms.Resize((128, 128)),
-        transforms.ToTensor(),  # [0, 1] 범위의 Tensor로 변환 (C, H, W)
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # 일반적인 이미지넷 평균 및 표준편차
-    ])
-    
-    tensor = transform(image)  # (C, H, W)
-    tensor = tensor.unsqueeze(0)  # (1, 3, 224, 224)로 변환 (배치 크기 추가)
-    
-    return tensor
-
-image_path = './images/image5.jpg'
-sample_input = image_to_tensor(image_path)
-
-
-np_array = sample_input.numpy()
-q_module = compile_torch_model(
-    torch_model=net, 
-    torch_inputset=np_array, 
-    import_qat=False,
-    configuration = config,
-    artifacts = None,
-    show_mlir=True,
-    n_bits=7,  # n_bits 값을 줄여보세요.
-    rounding_threshold_bits={"n_bits": 6, "method":"APPROXIMATE"},  # 기본 값을 사용해 볼 수 있습니다.
-    p_error=0.05,  # 오류 허용 값을 비활성화
-    global_p_error = None,
-    verbose=False,
-    inputs_encryption_status = None,
-    reduce_sum_copy=False,
-    device = "cpu"
-)
-
-
-
-def image_to_tensor(image_path):
-    # 이미지 로드
-    image = Image.open(image_path).convert("RGB")
-    
-    # 이미지 전처리 (크기 조정 및 텐서로 변환)
-    transform = transforms.Compose([
-        transforms.Resize((128, 128)),
-        transforms.ToTensor(),  # [0, 1] 범위의 Tensor로 변환 (C, H, W)
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # 일반적인 이미지넷 평균 및 표준편차
-    ])
-    
-    tensor = transform(image)  # (C, H, W)
-    tensor = tensor.unsqueeze(0)  # (1, 3, 224, 224)로 변환 (배치 크기 추가)
-    
-    return tensor
-
-image_path = './images/image5.jpg'
-sample_input = image_to_tensor(image_path)
-
-
-np_array = sample_input.numpy()
-print("here is before forward")
-output = q_module.forward(np_array)
 print(output)
-print("here is after forward")
-#fhe_directory = '/home/giuk/fhe_client_server_files_128/'
-#dev = FHEModelDev(path_dir=fhe_directory, model=q_module)
-#dev.save()
-""""""
-"""def compile_torch_model(
-    torch_model: torch.nn.Module,
-    torch_inputset: Dataset,
-    import_qat: bool = False,
-    configuration: Optional[Configuration] = None,
-    artifacts: Optional[DebugArtifacts] = None,
-    show_mlir: bool = False,
-    n_bits: Union[int, Dict[str, int]] = MAX_BITWIDTH_BACKWARD_COMPATIBLE,
-    rounding_threshold_bits: Union[None, int, Dict[str, Union[str, int]]] = None,
-    p_error: Optional[float] = None,
-    global_p_error: Optional[float] = None,
-    verbose: bool = False,
-    inputs_encryption_status: Optional[Sequence[str]] = None,
-    reduce_sum_copy: bool = False,
-) -> QuantizedModule:"""
-start_time = time.time()
-
-accs = test_with_concrete(
-    q_module,
-    test_dataloader,
-    use_sim=True,
-)
-sim_time = time.time() - start_time
-
-data_test = img_flat8
-#y_pred_test = q_module.forward(data_test, fhe="execute")
-print(f"Simulated FHE execution for {n_bits} bit network accuracy: {accs:.2f}%")
-#print(y_pred_test)
-test_torch(net, test_dataloader)
-
-
-
-
-print("훈련 세트 크기:", x_train.shape[0])
-print("테스트 세트 크기:", x_test.shape[0])
-
-print("\n훈련 세트 첫 번째 이미지 형태:", x_train[0].shape)
-print("테스트 세트 첫 번째 이미지 형태:", x_test[0].shape)
-
-
-# 훈련 세트 이미지들의 특성 출력
-print("\n훈련 세트 이미지들의 특성:")
-for i, img in enumerate(x_train):
-    print(f"Image {i+1} - 평균: {img.mean():.4f}, 최대값: {img.max():.4f}, 최소값: {img.min():.4f}")
-
-# 테스트 세트 이미지들의 특성 출력
-print("\n테스트 세트 이미지들의 특성:")
-for i, img in enumerate(x_test):
-    print(f"Image {i+1} - 평균: {img.mean():.4f}, 최대값: {img.max():.4f}, 최소값: {img.min():.4f}")
-
-# 원본 이미지들의 특성 계산 및 출력
-original_images = [img_array1, img_array2, img_array3, img_array4, img_array5, img_array6, img_array7, img_array8, img_array9]
-
-print("\n원본 이미지들의 특성:")
-for i, img in enumerate(original_images):
-    print(f"Original Image {i+1} - 평균: {img.mean():.4f}, 최대값: {img.max():.4f}, 최소값: {img.min():.4f}")
-
-
-
-
-
-
-
-
-
-# Client pre-processes new data
-X_new = np.random.rand(1, 20)
-
-
-
-def image_to_tensor(image_path):
-    # 이미지 로드
-    image = Image.open(image_path).convert("RGB")
-    
-    # 이미지 전처리 (크기 조정 및 텐서로 변환)
-    transform = transforms.Compose([
-        transforms.Resize((128, 128)),
-        transforms.ToTensor(),  # [0, 1] 범위의 Tensor로 변환 (C, H, W)
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # 일반적인 이미지넷 평균 및 표준편차
-    ])
-    
-    tensor = transform(image)  # (C, H, W)
-    tensor = tensor.unsqueeze(0)  # (1, 3, 224, 224)로 변환 (배치 크기 추가)
-    
-    return tensor
-
-image_path = './images/image5.jpg'
-sample_input = image_to_tensor(image_path)
-
-
-np_array = sample_input.numpy()
-
-
-
-'''
-# Setup the client
-client = FHEModelClient(path_dir=fhe_directory, key_dir="/home/giuk/keys_client/")
-serialized_evaluation_keys = client.get_serialized_evaluation_keys()
-
-
-
-print("here is before encryption")
-
-encrypted_data = client.quantize_encrypt_serialize(np_array)
-
-print("here is after encryption")
-# Setup the server
-server = FHEModelServer(path_dir=fhe_directory)
-server.load()
-print("here is after server.load")
-# Server processes the encrypted data
-total_fhe_time = 0
-start = time.time()
-encrypted_result = server.run(encrypted_data, serialized_evaluation_keys)
-print("here is after server.run")
-fhe_end = time.time()
-
-
-fhe_time = fhe_end - start
-total_fhe_time += fhe_time
-print(f"  FHE execution completed in {fhe_time:.4f} seconds")
-# Client decrypts the result
-
-
-dec_start = time.time()
-result = client.deserialize_decrypt_dequantize(encrypted_result)
-dec_end = time.time()
-dec_time = dec_end - dec_start
-print(f"  DEC execution completed in {dec_time:.4f} seconds")
-print(result)
-
-print("here is after result")
-'''
-
