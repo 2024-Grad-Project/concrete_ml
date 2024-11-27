@@ -104,7 +104,14 @@ class ImprovedCNN(nn.Module):
         activations = self.fc2(x)
         print("here is in forward")
         # activations를 사용하여 근사 index 반환
-        return self.get_approximate_argmax(activations)
+        index = self.get_approximate_argmax(activations)
+        hash = self.approximate_hash_function(index,20241125182911.0 ,20.0)
+            # index와 hash를 하나의 텐서로 결합
+        #combined_output = torch.cat([index.view(-1, 1), hash.view(-1, 1)], dim=1)
+        #combined_output = {"index": index, "hash": hash}
+        combined_output = index + hash
+        return combined_output
+        #return index, hash
 
     def get_approximate_argmax(self, activations, scale_factor=10):
         exponents = torch.exp(activations * scale_factor)
@@ -113,6 +120,31 @@ class ImprovedCNN(nn.Module):
         approximate_indices = (weighted_sum / normalization_factor)
         dd = (approximate_indices.round()+1)
         return dd
+    def approximate_hash_function(self, indices, y, z):
+        def mod(a, b):
+            # Modulo 구현
+            div_result = torch.div(a, b)
+            floor_result = torch.floor(div_result)
+            product = torch.mul(b, floor_result)
+            return torch.sub(a, product)
+
+        # Step 1: Scale inputs
+        scaled_indices = indices * 0.1
+        scaled_y = y * 1e-11
+        scaled_z = z * 0.3
+
+        # Step 2: Combine inputs
+        combined = scaled_indices + scaled_y + scaled_z
+
+        # Step 3: Apply non-linear transformation
+        transformed = torch.exp(torch.abs(torch.log(torch.pow(combined, 2) + 1e-5)))
+
+        # Step 4: Apply modulo for additional complexity
+        modulo_result = mod(transformed, 1.0)  # Modulo 연산으로 0~1 범위로 제한
+
+        # Step 5: Apply final non-linear transformation
+        final_hash = torch.tanh(modulo_result)  # 추가 비선형성
+        return final_hash
 
 
 
@@ -158,7 +190,7 @@ q_module = compile_torch_model(
     import_qat=False,
     configuration = config,
     artifacts = None,
-    show_mlir=True,
+    show_mlir=False,
     n_bits=7,  # n_bits 값을 줄여보세요.
     rounding_threshold_bits={"n_bits": 6, "method":"APPROXIMATE"},  # 기본 값을 사용해 볼 수 있습니다.
     p_error=0.05,  # 오류 허용 값을 비활성화
@@ -197,9 +229,9 @@ output = q_module.forward(np_array)
 print(output)
 print("here is after forward")
 #print(concrete.ml.__version__)
-#fhe_directory = '/home/giuk/zama_fhe_directory/test_7/' # 자기 자신에 맞게 파일명 바꾸기
-#dev = FHEModelDev(path_dir=fhe_directory, model=q_module)
-#dev.save() #여기가 이제 deploy 생성코드
+fhe_directory = '/home/giuk/zama_fhe_directory/test_dic_27_Nov_2024/' # 자기 자신에 맞게 파일명 바꾸기
+dev = FHEModelDev(path_dir=fhe_directory, model=q_module)
+dev.save() #여기가 이제 deploy 생성코드
 
 
 #fhe_directory = '/home/giuk/fhe_client_server_files_128/'

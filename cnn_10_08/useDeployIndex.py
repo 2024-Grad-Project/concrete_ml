@@ -6,7 +6,7 @@ from torch.autograd import Variable
 from concrete.ml.deployment import FHEModelDev, FHEModelClient, FHEModelServer
 from concrete import fhe
 #여기서부터 deploy _ client & server
-fhe_directory = '/home/giuk/zama_fhe_directory/test_3/' # 자기 자신에 맞게 파일명 바꾸기
+fhe_directory = '/home/giuk/zama_fhe_directory/test_dic_27_Nov_2024/'#''/home/giuk/zama_fhe_directory/test_3/' # 자기 자신에 맞게 파일명 바꾸기
 # Setup the client
 client = FHEModelClient(path_dir=fhe_directory, key_dir="/home/giuk/keys_client_cnn_13_Nov_999/")
 serialized_evaluation_keys = client.get_serialized_evaluation_keys()
@@ -62,6 +62,7 @@ print("here is after server.run")
 # Client decrypts the result
 print("This is the decryption result without multiplying the ciphertext by a constant.")
 result = client.deserialize_decrypt_dequantize(encrypted_result)
+print("real result")
 print(result)
 num = 12345
 byte_length = 4  # 바이트 길이 설정
