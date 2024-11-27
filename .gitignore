@@ -4,3 +4,4 @@ cnn_10_08/images/*
 deepfake/*
 nsfw_detecct/images/*
 deepfake_detect/resnetinceptionv1_epoch_32.pth
+deepfake_detect/images/*
