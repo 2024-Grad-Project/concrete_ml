@@ -11,7 +11,7 @@ class Counter:
         return (x * y) % 20  # 곱셈
     
 
-# 입력셋 설정 (각 함수별 입력셋 구분)
+# 입력셋 설정 ( 각 함수별 입력셋 구분 )
 inputset = list(range(20))
 inputset2 = [(20, 3), (5, 3), (2, 2), (3, 1), (1, 4), (11, 1), (15, 1), (17, 2)]
 CounterFhe = Counter.compile({"inc": inputset, "dec": inputset2})

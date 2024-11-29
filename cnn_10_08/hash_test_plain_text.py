@@ -1,9 +1,9 @@
 import math
 
 def mod(a, b):
-    # Modulo 연산 구현
+    # Modulo  연산  구현
     return a - math.floor(a / b) * b
-
+  
 def custom_forward(indices, y, z):
     # Step 1: Scale inputs
     scaled_indices = indices * 0.1
