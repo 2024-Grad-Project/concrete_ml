@@ -3,12 +3,12 @@ from concrete import fhe
 @fhe.module()
 class Counter:
     @fhe.function({"x": "encrypted"})
-    def inc(x):
-        return (x + 1) % 20  # 연산 우선순위 문제 해결
+    def add(x):
+        return (x + 1) % 20  # 덧셈
 
     @fhe.function({"x": "encrypted", "y": "clear"})
-    def dec(x, y):
-        return (x * y) % 20  # % 연산자의 우선순위 문제 해결
+    def mul(x, y):
+        return (x * y) % 20  # 곱셈
     
 
 # 입력셋 설정 (각 함수별 입력셋 구분)

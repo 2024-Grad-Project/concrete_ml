@@ -282,10 +282,16 @@ print("The model has been saved.")
 
 # 컴파일된 모델로 추론 The results are as follows:
 print("We will perform inference using the compiled model.")
-output_fhe = quantized_module.forward(iamage_input.numpy(), constant_input.numpy())
 
+
+output_fhe = quantized_module.forward(iamage_input.numpy(), constant_input.numpy())
 print("The results are as follows:")
 print(output_fhe)
+
+
+
+
+
 fhe_end = time.time()
 fhe_time = fhe_end - start
 print(f"FHE execution completed in {fhe_time:.4f} seconds")
