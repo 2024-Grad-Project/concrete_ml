@@ -231,7 +231,7 @@ for entry in entries:
     plt.imshow(image)
 plt.show()
 '''
-# Concrete-ML로 모델 컴파일   compile with concrete ML
+# Concrete-ML로 모델 컴파일      compile with concrete ML
 from concrete.ml.torch.compile import compile_torch_model
 testimage = Image.open('./images/19.jpg')
 image_tensor3 = test_transforms(testimage).float()
