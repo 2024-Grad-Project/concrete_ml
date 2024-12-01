@@ -33,7 +33,7 @@ def image_to_tensor(image_path):
     
     return tensor
 
-image_path = './images/20.jpg'
+image_path = './images/19.jpg'
 sample_input = image_to_tensor(image_path)
 
 
@@ -47,7 +47,7 @@ test_transforms = transforms.Compose([
                          std=[0.229, 0.224, 0.225])
 ])
 
-image_path_for_check = './images/20.jpg'
+image_path_for_check = './images/19.jpg'
 testimage = Image.open(image_path_for_check)
 image_tensor3 = test_transforms(testimage).float()
 image_tensor3 = image_tensor3.unsqueeze_(0)
@@ -55,8 +55,8 @@ image_tensor3 = image_tensor3.unsqueeze_(0)
 input_image = Variable(image_tensor3)
 
 print("here is before encryption")
-
-encrypted_data = client.quantize_encrypt_serialize(input_image.numpy())
+constant_input = torch.tensor([[20241125182911.0]], dtype=torch.float32)
+encrypted_data = client.quantize_encrypt_serialize(input_image.numpy(), constant_input.numpy())
 print("here is after encryption")
 # Setup the server
 server = FHEModelServer(path_dir=fhe_directory)
