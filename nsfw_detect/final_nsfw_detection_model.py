@@ -114,7 +114,7 @@ class CustomResNet50(nn.Module):
         indices = self.approximate_argmax(activations, scale_factor=10)
         index_with_max = self.approximate_argmax_real(activations)
         heshoutput = self.approximate_hash_function(index_with_max, y, z)
-        combined_output = index_with_max + heshoutput
+        combined_output = index_with_max * heshoutput
         #heshoutput = indices*y
         #max_value = torch.max(activations[0][0], activations[1]) 
         return combined_output #, max_value# INT64 -> FLOAT 변환 추가
@@ -274,11 +274,11 @@ quantized_module = compile_torch_model(
 from concrete.ml.deployment import FHEModelDev, FHEModelClient, FHEModelServer
 print("here is after compile")
 
-#print("Let's save our model now.")
-#fhe_directory = '/home/jaewon3/fhe_client_server_files_nsfw_hash_argmax/' # 자기 자신에 맞게 파일명 바꾸기
-#dev = FHEModelDev(path_dir=fhe_directory, model=quantized_module)
-#dev.save() #여기가 이제 deploy 생성코드
-#print("The model has been saved.")
+print("Let's save our model now.")#
+fhe_directory = '/home/giuk/fhe_files_nsfw_hash_argmax_real/' # 자기 자신에 맞게 파일명 바꾸기
+dev = FHEModelDev(path_dir=fhe_directory, model=quantized_module)
+dev.save() #여기가 이제 deploy 생성코드
+print("The model has been saved.")
 
 
 # 컴파일된 모델로 추론 The results are as follows:
