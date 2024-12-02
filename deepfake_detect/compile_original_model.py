@@ -71,9 +71,11 @@ result = detector.detect(input_image)
 print("Prediction:", result['prediction'])
 print("Confidence (Real):", result['real_confidence'])
 print("Confidence (Fake):", result['fake_confidence'])
-# TorchScript로 모델 스크립트화
-# 더미 입력 텐서를 생성하여 모델을 트레이싱
 
+
+
+# Save the model as a TorchScript file
+# Create a dummy input tensor to trace the model
 '''
 dummy_input = torch.randn(1, 3, 160, 160)  # InceptionResnetV1 입력 크기
 traced_model = torch.jit.trace(detector.model, dummy_input)
@@ -96,7 +98,7 @@ config = Configuration(
 
 
 from torchvision import transforms
-# 전처리 파이프라인
+# Preprocessing pipeline
 preprocess = transforms.Compose([
     transforms.Resize(256),
     transforms.CenterCrop(256),
@@ -104,20 +106,20 @@ preprocess = transforms.Compose([
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
 ])
 
-# PIL 이미지를 텐서로 변환
+# Convert the PIL image to a tensor
 image_tensor = preprocess(input_image).unsqueeze(0)  # Add batch dimension
 print("now, we start compile")
 constant_input = torch.tensor([[20241125182911.0]], dtype=torch.float32)
 quantized_module = compile_torch_model(
-    torch_model = detector.model,  # 변환된 모델 사용
-    torch_inputset = image_tensor,  # 입력 텐서
+    torch_model = detector.model,  # Use the converted model
+    torch_inputset = image_tensor, # Input tensor
     import_qat=False,
     configuration = config,
     artifacts = None,
     show_mlir=False,
-    n_bits = 7,  # 양자화 비트 수
+    n_bits = 7,  # Number of quantization bits
     rounding_threshold_bits= {"n_bits": 7, "method": "approximate"},
-    p_error=0.05,  # 오류 허용 값을 비활성화
+    p_error=0.05,   # Disable error tolerance
     global_p_error = None,
     verbose= False,
     inputs_encryption_status = None,

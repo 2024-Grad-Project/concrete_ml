@@ -148,7 +148,7 @@ def manual_rescale(tensors):
 class ReplaceConcat(torch.fx.Transformer):
     def call_function(self, target: callable, args, kwargs):
         if target == torch.cat:
-            print(f"Replacing 'torch.cat' at Node: {args}")
+            #print(f"Replacing 'torch.cat' at Node: {args}")
             tensors = args[0]  # 'cat' 연산의 입력 텐서 리스트
             rescaled_tensors = manual_rescale(tensors)  # 스케일 맞추기
             return torch.cat(rescaled_tensors, dim=args[1])  # 재결합
@@ -156,7 +156,7 @@ class ReplaceConcat(torch.fx.Transformer):
 
     def call_module(self, target: str, args, kwargs):
         if "cat" in target:
-            print(f"Replacing 'torch.cat' module at Node: {args}")
+            #print(f"Replacing 'torch.cat' module at Node: {args}")
             tensors = args[0]
             rescaled_tensors = manual_rescale(tensors)
             return torch.cat(rescaled_tensors, dim=args[1])
@@ -173,10 +173,10 @@ traced_model = symbolic_trace(detector.model)
 
 
 # GlobalAveragePool 연산 제거 & avgpool_1a 노드 변환 적용
-transformed_model_1 = ReplaceGlobalAveragePool(traced_model).transform()
+#transformed_model_1 = ReplaceGlobalAveragePool(traced_model).transform()
 
 # Mean 연산 대체
-transformed_model_2 = MeanToMatMulTransform(transformed_model_1).transform()
+transformed_model_2 = MeanToMatMulTransform(traced_model).transform()
 
 # 모델을 Symbolic Trace로 추적
 traced_model = symbolic_trace(detector.model)
@@ -226,7 +226,7 @@ print("now, we start compile")
 quantized_module = compile_torch_model(
     torch_model = transformed_model_3,  # 변환된 모델 사용
     torch_inputset = image_tensor,  # 입력 텐서
-    import_qat=False,
+    import_qat=True,
     configuration = config,
     artifacts = None,
     show_mlir=False,

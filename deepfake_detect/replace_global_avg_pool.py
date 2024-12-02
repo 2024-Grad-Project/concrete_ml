@@ -71,16 +71,7 @@ result = detector.detect(input_image)
 print("Prediction:", result['prediction'])
 print("Confidence (Real):", result['real_confidence'])
 print("Confidence (Fake):", result['fake_confidence'])
-# TorchScript로 모델 스크립트화
-# 더미 입력 텐서를 생성하여 모델을 트레이싱
 
-'''
-dummy_input = torch.randn(1, 3, 160, 160)  # InceptionResnetV1 입력 크기
-traced_model = torch.jit.trace(detector.model, dummy_input)
-
-# 모델 저장
-traced_model.save("detector_traced.pt")
-print("트레이싱된 모델 저장 완료!")'''
 import torch
 import torch.fx
 from torch.fx import symbolic_trace
@@ -227,11 +218,11 @@ def transform_model_for_fhe(model: nn.Module) -> nn.Module:
         return model_copy  # Return the partially transformed model if tracing fails
 
 
-#transformed_model = transform_model_for_fhe(detector.model)
 
 
 
-# 그 다음 나머지 변환 적용
+
+# Apply transformations
 transformed_model = transform_model_for_fhe(detector.model)
 
 from concrete.ml.torch.compile import compile_torch_model
@@ -246,7 +237,7 @@ config = Configuration(
 
 
 from torchvision import transforms
-# 전처리 파이프라인
+# Preprocessing pipeline
 preprocess = transforms.Compose([
     transforms.Resize(256),
     transforms.CenterCrop(256),
@@ -254,20 +245,20 @@ preprocess = transforms.Compose([
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
 ])
 
-# PIL 이미지를 텐서로 변환
+# Convert the PIL image to a tensor
 image_tensor = preprocess(input_image).unsqueeze(0)  # Add batch dimension
 print("now, we start compile")
 
 quantized_module = compile_torch_model(
-    torch_model = transformed_model,  # 변환된 모델 사용
-    torch_inputset = image_tensor,  # 입력 텐서
+    torch_model = transformed_model,  # Use the converted model
+    torch_inputset = image_tensor,  # Use the converted model
     import_qat=False,
     configuration = config,
     artifacts = None,
     show_mlir=False,
-    n_bits = 7,  # 양자화 비트 수
+    n_bits = 7,    # Number of quantization bits
     rounding_threshold_bits= {"n_bits": 7, "method": "approximate"},
-    p_error=0.05,  # 오류 허용 값을 비활성화
+    p_error=0.05,  # Disable error tolerance
     global_p_error = None,
     verbose= False,
     inputs_encryption_status = None,
