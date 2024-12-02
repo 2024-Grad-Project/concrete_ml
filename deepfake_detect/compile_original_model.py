@@ -109,7 +109,7 @@ preprocess = transforms.Compose([
 # Convert the PIL image to a tensor
 image_tensor = preprocess(input_image).unsqueeze(0)  # Add batch dimension
 print("now, we start compile")
-constant_input = torch.tensor([[20241125182911.0]], dtype=torch.float32)
+
 quantized_module = compile_torch_model(
     torch_model = detector.model,  # Use the converted model
     torch_inputset = image_tensor, # Input tensor
