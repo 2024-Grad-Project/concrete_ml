@@ -6,9 +6,6 @@ import numpy as np
 from torch.fx import symbolic_trace
 
 
-
-
-
 class FaceDeepfakeDetector:
     def __init__(self, device='cpu', mtcnn_kwargs=None, inception_kwargs=None, checkpoint_path=None):
         self.device = device
@@ -60,8 +57,6 @@ class FaceDeepfakeDetector:
         return result
 
 
-
-
 detector = FaceDeepfakeDetector(
     device='cpu',
     checkpoint_path='./resnetinceptionv1_epoch_32.pth'
@@ -74,42 +69,39 @@ result = detector.detect(input_image)
 '''
 
 
-# Custom 변환 클래스 정의
+# Define custom transformation class
 class MeanToMatMulTransform(torch.fx.Transformer):
     def call_method(self, target: str, args, kwargs):
         if target == 'mean':
             print(f"Replacing 'mean' with matrix multiplication and scaling at node {target}")
             
-            # 입력 텐서를 펼친 후, H * W로 나눠 스케일링
+            # Flatten the input tensor and scale it by H * W
             x = args[0]
             H, W = x.shape[2], x.shape[3]
             num_elements = H * W
 
-            # 평균을 내는 대신 행렬 곱과 스케일링 적용
+            # Replace mean operation with matrix multiplication and scaling
             x = x.flatten(2)  # (N, C, H*W)
-            x = x.sum(dim=-1)  # H * W 차원을 sum으로 합침
-            x = x / num_elements  # H * W 요소로 나눠 평균 근사
-            return x  # 변환된 결과 반환
+            x = x.sum(dim=-1)  # Sum over H * W dimension
+            x = x / num_elements  # Approximate mean by dividing by H * W
+            return x  # Return the transformed result
         return super().call_method(target, args, kwargs)
 
 
-
-
-
-# manual_rescale 함수 정의
+# Define the manual_rescale function
 def manual_rescale(tensors):
     """
-    모든 입력 텐서를 동일한 scale과 zero_point로 변환합니다.
+    Convert all input tensors to have the same scale and zero_point.
     Args:
-        tensors (list of torch.Tensor): 입력 텐서 리스트.
+        tensors (list of torch.Tensor): List of input tensors.
     Returns:
-        list of torch.Tensor: 동일한 scale과 zero_point로 변환된 텐서 리스트.
+        list of torch.Tensor: List of tensors with the same scale and zero_point.
     """
-    # 기준 scale과 zero_point를 첫 번째 텐서에서 가져옴
+    # Get reference scale and zero_point from the first tensor
     target_scale = tensors[0].q_scale()  # Quantization scale
     target_zero_point = tensors[0].q_zero_point()  # Quantization zero_point
 
-    # 모든 텐서를 동일한 scale과 zero_point로 변환
+    # Convert all tensors to the same scale and zero_point
     rescaled_tensors = [
         tensor.dequantize().mul(target_scale / tensor.q_scale()).add(
             target_zero_point - tensor.q_zero_point()
@@ -117,26 +109,26 @@ def manual_rescale(tensors):
         for tensor in tensors
     ]
 
-    # 다시 양자화된 텐서로 변환
+    # Requantize tensors back to quantized format
     quantized_tensors = [
         torch.quantize_per_tensor(rescaled_tensor, scale=target_scale, zero_point=target_zero_point, dtype=torch.qint8)
         for rescaled_tensor in rescaled_tensors
     ]
     return quantized_tensors
 
-# manual_rescale 함수 수정
+# Modify the manual_rescale function
 def manual_rescale(tensors):
     """
-    모든 입력 텐서를 동일한 scale과 zero_point로 변환합니다.
+    Convert all input tensors to have the same scale and zero_point.
     """
-    # 기준 스케일과 제로 포인트 정의
+    # Define reference scale and zero_point
     target_scale = 1.0
     target_zero_point = 0
 
-    # 모든 텐서를 동일한 스케일과 제로 포인트로 변환
+    # Convert all tensors to the same scale and zero_point
     rescaled_tensors = []
     for tensor in tensors:
-        # 양자화된 텐서라면 디양자화 후 스케일 맞추기
+        # Dequantize if the tensor is quantized
         if hasattr(tensor, "dequantize"):
             tensor = tensor.dequantize()
         rescaled_tensor = tensor * target_scale + target_zero_point
@@ -144,14 +136,14 @@ def manual_rescale(tensors):
     return rescaled_tensors
 
 
-# ReplaceConcat 클래스 수정
+# Modify the ReplaceConcat class
 class ReplaceConcat(torch.fx.Transformer):
     def call_function(self, target: callable, args, kwargs):
         if target == torch.cat:
             #print(f"Replacing 'torch.cat' at Node: {args}")
-            tensors = args[0]  # 'cat' 연산의 입력 텐서 리스트
-            rescaled_tensors = manual_rescale(tensors)  # 스케일 맞추기
-            return torch.cat(rescaled_tensors, dim=args[1])  # 재결합
+            tensors = args[0]  # List of input tensors for 'cat' operation
+            rescaled_tensors = manual_rescale(tensors)  # Rescale tensors
+            return torch.cat(rescaled_tensors, dim=args[1])  # Recombine tensors
         return super().call_function(target, args, kwargs)
 
     def call_module(self, target: str, args, kwargs):
@@ -163,41 +155,31 @@ class ReplaceConcat(torch.fx.Transformer):
         return super().call_module(target, args, kwargs)
 
 
-
-
-
-
-
-# 모델 변환 실행
+# Execute model transformation
 traced_model = symbolic_trace(detector.model)
 
 
-# GlobalAveragePool 연산 제거 & avgpool_1a 노드 변환 적용
-#transformed_model_1 = ReplaceGlobalAveragePool(traced_model).transform()
+# Remove GlobalAveragePool operation & apply avgpool_1a node transformation
+# transformed_model_1 = ReplaceGlobalAveragePool(traced_model).transform()
 
-# Mean 연산 대체
+# Replace mean operations
 transformed_model_2 = MeanToMatMulTransform(traced_model).transform()
 
-# 모델을 Symbolic Trace로 추적
+# Trace the model with Symbolic Trace
 traced_model = symbolic_trace(detector.model)
 
 
 transformed_model_3 = ReplaceConcat(transformed_model_2).transform()
 
 
-
-
-
 from PIL import Image
 
 input_image = Image.open('./images/fake_frame_1.png')
 result = detector.detect(input_image) 
-#result2 = transformed_model_final(input_image)
+# result2 = transformed_model_final(input_image)
 print("Prediction:", result['prediction'])
 print("Confidence (Real):", result['real_confidence'])
 print("Confidence (Fake):", result['fake_confidence'])
-
-
 
 
 from concrete.ml.torch.compile import compile_torch_model
@@ -209,10 +191,8 @@ config = Configuration(
 )
 
 
-
-
 from torchvision import transforms
-# 전처리 파이프라인
+# Preprocessing pipeline
 preprocess = transforms.Compose([
     transforms.Resize(256),
     transforms.CenterCrop(256),
@@ -220,26 +200,22 @@ preprocess = transforms.Compose([
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
 ])
 
-# PIL 이미지를 텐서로 변환
+# Convert the PIL image to a tensor
 image_tensor = preprocess(input_image).unsqueeze(0)  # Add batch dimension
 print("now, we start compile")
 quantized_module = compile_torch_model(
-    torch_model = transformed_model_3,  # 변환된 모델 사용
-    torch_inputset = image_tensor,  # 입력 텐서
+    torch_model = transformed_model_3,  # Use the transformed model
+    torch_inputset = image_tensor,  # Input tensor
     import_qat=True,
     configuration = config,
     artifacts = None,
     show_mlir=False,
-    n_bits = 7,  # 양자화 비트 수
+    n_bits = 7,  # Number of quantization bits
     rounding_threshold_bits= {"n_bits": 7, "method": "approximate"},
-    p_error=0.05,  # 오류 허용 값을 비활성화
+    p_error=0.05,  # Disable error tolerance
     global_p_error = None,
     verbose= False,
     inputs_encryption_status = None,
     reduce_sum_copy= False,
     device = "cpu"
 )
-
-
-
-

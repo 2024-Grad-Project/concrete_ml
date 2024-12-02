@@ -62,6 +62,19 @@ detector = FaceDeepfakeDetector(
     checkpoint_path='./resnetinceptionv1_epoch_32.pth'
 )
 
+
+
+
+
+
+
+
+
+
+
+
+
+
 # Custom transformation class definition
 class MeanToMatMulTransform(torch.fx.Transformer):
     def call_method(self, target: str, args, kwargs):
@@ -313,6 +326,11 @@ traced_model = symbolic_trace(detector.model)
 transformed_model3 = ReplaceGlobalAveragePool(transformed_model_final).transform()
 transformed_model4 = ReplaceConcat(transformed_model3).transform()
 
+
+
+
+
+
 # Check nodes in the transformed model
 for node in transformed_model4.graph.nodes:
     print(node)
@@ -336,6 +354,13 @@ for node in transformed_model3.graph.nodes:
 # for node in transformed_model_2.graph.nodes:
 #     print(node)
 
+
+
+
+
+
+
+
 from PIL import Image
 
 input_image = Image.open('./images/fake_frame_1.png')
@@ -344,19 +369,12 @@ result = detector.detect(input_image)  # transformed_model_final
 print("Prediction:", result['prediction'])
 print("Confidence (Real):", result['real_confidence'])
 print("Confidence (Fake):", result['fake_confidence'])
-# Save the model as a TorchScript file
-# Create a dummy input tensor to trace the model
 
-'''
-dummy_input = torch.randn(1, 3, 160, 160)  # Input size for InceptionResnetV1
-traced_model = torch.jit.trace(detector.model, dummy_input)
 
-# Save the model
-traced_model.save("detector_traced.pt")
-print("Model tracing completed and saved!")
-'''
-# print("result2")
-# print(result2)
+
+
+
+
 
 from concrete.ml.torch.compile import compile_torch_model
 from concrete.fhe import Configuration
@@ -381,7 +399,7 @@ print("now, we start compile")
 quantized_module = compile_torch_model(
     torch_model = transformed_model4,  # Use the transformed model
     torch_inputset = image_tensor,  # Input tensor
-    import_qat=False,
+    import_qat=True,
     configuration = config,
     artifacts = None,
     show_mlir=False,
